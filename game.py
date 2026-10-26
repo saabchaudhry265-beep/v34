@@ -1454,4 +1454,4 @@ def ASSETS_PATH():
 
 
 if __name__ == "__main__":
-    Game().run()
+    Game().main_loop()

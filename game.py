@@ -77,7 +77,7 @@ class Game(SaveMixin, CombatMixin, AIMixin, RenderMixin, UIMixin):
         self.creator = {"char": 0, "mode": "campaign"}
         self.cut = None
         self.mode = "campaign"
-        self.relics, self.run, self.run_stats = {}, {"floor": 1, "zi": 0, "shards": 0}, {"kills": 0}
+        self.relics, self.abyss_run, self.run_stats = {}, {"floor": 1, "zi": 0, "shards": 0}, {"kills": 0}
         self.scale_mul = 1.0
         self.return_area = "zone0"
         self.boon = None
@@ -579,7 +579,7 @@ class Game(SaveMixin, CombatMixin, AIMixin, RenderMixin, UIMixin):
             self.world().pois.remove(obj)
             self.open_boon("Алтарь реликвий", self.relic_offers(3), "free")
         elif what == "stall":
-            price = 40 + 12 * self.run["floor"]
+            price = 40 + 12 * self.abyss_run["floor"]
             self.open_boon("Торговец Бездны", self.relic_offers(3, price), "shop")
         elif what == "stairs":
             self.go(self.next_floor)
@@ -869,7 +869,7 @@ class Game(SaveMixin, CombatMixin, AIMixin, RenderMixin, UIMixin):
         enemies = self.current()["enemies"]
         pool = SPAWN[min(2, zi)] if self.area_kind() != "pass" else SPAWN[min(2, zi + 1)]
         kinds, weights = list(pool), list(pool.values())
-        floor = self.run["floor"] if self.mode == "abyss" else 1
+        floor = self.abyss_run["floor"] if self.mode == "abyss" else 1
         n = {"combat": 4 + zi + random.randint(0, 2) + (floor // 3 if self.mode == "abyss" else 0), "trap": 3}.get(kind, 2)
 
         def place(k, special=None):
@@ -887,8 +887,8 @@ class Game(SaveMixin, CombatMixin, AIMixin, RenderMixin, UIMixin):
             for _ in range(n):
                 place(random.choices(kinds, weights=weights)[0])
         elif kind in ("miniboss", "boss"):
-            if kind == "boss" and self.mode == "abyss" and self.run["floor"] % 3 == 0:
-                boss = self.make_boss(min(2, (self.run["floor"] // 3 - 1) % 3), cx, cy, 1)
+            if kind == "boss" and self.mode == "abyss" and self.abyss_run["floor"] % 3 == 0:
+                boss = self.make_boss(min(2, (self.abyss_run["floor"] // 3 - 1) % 3), cx, cy, 1)
                 boss.room = i
                 enemies.append(boss)
                 self.banner = {"t": 0.0, "title": BOSSES[boss.zone]["name"], "sub": BOSSES[boss.zone]["title"], "color": BOSSES[boss.zone]["color"]}
@@ -932,7 +932,7 @@ class Game(SaveMixin, CombatMixin, AIMixin, RenderMixin, UIMixin):
         kind = room["kind"]
         self.hazards = [h for h in self.hazards if h["owner"] is not None or h.get("linger")]
         if self.area_kind() == "abyss":
-            self.p["gold"] += int(8 * self.run["floor"] * (1 + 0.25 * self.mod_count("gold")))
+            self.p["gold"] += int(8 * self.abyss_run["floor"] * (1 + 0.25 * self.mod_count("gold")))
         if kind in ("miniboss", "boss"):
             cx, cy = room["center"]
             if self.area_kind() == "dungeon":
@@ -942,7 +942,7 @@ class Game(SaveMixin, CombatMixin, AIMixin, RenderMixin, UIMixin):
                 self.notify("Подземелье зачищено! Награда появилась в центре зала.", GOLD)
             elif self.area_kind() == "abyss":
                 w.pois.append({"kind": "stairs", "x": cx, "y": cy + 60})
-                self.run["shards"] += 3 + self.run["floor"]
+                self.abyss_run["shards"] += 3 + self.abyss_run["floor"]
                 self.open_boon("Награда за этаж", self.relic_offers(3), "free")
         elif self.area_kind() == "abyss" and random.random() < 0.4:
             self.add_drop(room["center"][0], room["center"][1], self.make_item(self.zone_index()))
@@ -1002,7 +1002,7 @@ class Game(SaveMixin, CombatMixin, AIMixin, RenderMixin, UIMixin):
             self.save_game(quiet=True)
         self.mode = "abyss"
         self.relics = {}
-        self.run = {"floor": 1, "zi": 0, "shards": 0, "ended": False}
+        self.abyss_run = {"floor": 1, "zi": 0, "shards": 0, "ended": False}
         self.run_stats = {"kills": 0}
         self.p = self.new_player()
         self.apply_character(ch)
@@ -1020,7 +1020,7 @@ class Game(SaveMixin, CombatMixin, AIMixin, RenderMixin, UIMixin):
 
     def build_abyss_floor(self, floor):
         zi = min(2, (floor - 1) // 3)
-        self.run["floor"], self.run["zi"] = floor, zi
+        self.abyss_run["floor"], self.abyss_run["zi"] = floor, zi
         self.scale_mul = 1 + 0.18 * (floor - 1)
         n_combat = 3 + min(3, floor // 2)
         kinds = ["combat"] * 2 + ["treasure" if floor % 2 else "shop"] + ["combat"] * (n_combat - 2) + ["boss"]
@@ -1038,17 +1038,17 @@ class Game(SaveMixin, CombatMixin, AIMixin, RenderMixin, UIMixin):
     def next_floor(self):
         self.transient_clear()
         self.p["hp"] = min(self.max_hp(), self.p["hp"] + self.max_hp() * 0.3)
-        self.build_abyss_floor(self.run["floor"] + 1)
-        self.banner = {"t": 0.0, "title": "Этаж {}".format(self.run["floor"]), "sub": ZONES[self.run["zi"]]["name"], "color": PURPLE}
+        self.build_abyss_floor(self.abyss_run["floor"] + 1)
+        self.banner = {"t": 0.0, "title": "Этаж {}".format(self.abyss_run["floor"]), "sub": ZONES[self.abyss_run["zi"]]["name"], "color": PURPLE}
         self.shake = 6
 
     def end_run(self):
-        if self.mode != "abyss" or self.run.get("ended"):
+        if self.mode != "abyss" or self.abyss_run.get("ended"):
             return
-        self.run["ended"] = True
-        floor = self.run["floor"]
-        shards = self.run["shards"] + floor * 3 + self.run_stats["kills"] // 15
-        self.run["shards"] = shards
+        self.abyss_run["ended"] = True
+        floor = self.abyss_run["floor"]
+        shards = self.abyss_run["shards"] + floor * 3 + self.run_stats["kills"] // 15
+        self.abyss_run["shards"] = shards
         self.meta["shards"] += shards
         self.meta["best"] = max(self.meta["best"], floor)
         self.meta["runs"] += 1
@@ -1454,4 +1454,4 @@ def ASSETS_PATH():
 
 
 if __name__ == "__main__":
-    Game().main_loop()
+    Game().run()
